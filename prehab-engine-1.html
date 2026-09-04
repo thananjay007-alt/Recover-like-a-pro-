@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Prehab Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#EFF1EC; --panel:#E4E8E0; --ink:#16241C; --ink-soft:#4B594F;
+    --line:#B9C2B7; --rust:#C1440E; --rust-soft:#f0d9cd; --teal:#3D6B5C;
+    --teal-soft:#dbe7e2; --sage:#7A8B7F;
+    --serif:'Fraunces', serif; --mono:'JetBrains Mono', monospace; --sans:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.5; -webkit-font-smoothing:antialiased;}
+  a{color:inherit}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 28px;}
+
+  header{border-bottom:1px solid var(--line); padding:22px 0;}
+  header .wrap{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+  .brand{font-family:var(--serif); font-size:1.35rem; font-weight:600; letter-spacing:-0.01em;}
+  .brand span{color:var(--rust);}
+  .account-bar{font-family:var(--mono); font-size:0.68rem; color:var(--ink-soft); display:flex; align-items:center; gap:12px;}
+  .account-bar button{font-family:var(--mono); font-size:0.68rem; color:var(--sage); background:none; border:none; text-decoration:underline; cursor:pointer;}
+
+  /* LOGIN GATE */
+  #login-gate{
+    position:fixed; inset:0; background:rgba(22,36,28,0.92);
+    display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .login-card{
+    background:var(--bg); border:1px solid var(--ink); padding:38px 34px; max-width:400px; width:100%;
+  }
+  .login-card h2{font-family:var(--serif); font-weight:500; font-size:1.5rem; margin-bottom:10px;}
+  .login-card p{color:var(--ink-soft); font-size:0.92rem; margin-bottom:22px; line-height:1.55;}
+  .login-card input{
+    width:100%; font-family:var(--sans); font-size:0.98rem; padding:12px 14px;
+    background:var(--panel); border:1px solid var(--line); border-radius:2px; margin-bottom:14px; color:var(--ink);
+  }
+  .login-card input:focus{outline:2px solid var(--teal); outline-offset:1px;}
+  .login-card button{
+    width:100%; font-family:var(--sans); font-weight:600; font-size:0.98rem; padding:14px;
+    background:var(--ink); color:var(--bg); border:none; border-radius:2px; cursor:pointer;
+  }
+  .login-card .fineprint{font-family:var(--mono); font-size:0.64rem; color:var(--sage); margin-top:14px; text-align:center;}
+  .login-error{color:var(--rust); font-family:var(--mono); font-size:0.7rem; margin-bottom:10px; display:none;}
+
+  .stage{display:grid; grid-template-columns:0.85fr 1.15fr; gap:56px; padding:56px 0 40px; align-items:start;}
+  @media (max-width:880px){ .stage{grid-template-columns:1fr; gap:36px; padding:32px 0;} }
+  .diagram-col{position:sticky; top:24px;}
+  @media (max-width:880px){ .diagram-col{position:static;} }
+
+  h1{font-family:var(--serif); font-weight:500; font-size:2.15rem; line-height:1.12; letter-spacing:-0.01em; max-width:11ch; margin-bottom:14px;}
+  .lede{max-width:46ch; color:var(--ink-soft); font-size:1.02rem; margin-bottom:6px;}
+
+  .diagram-frame{background:var(--panel); border:1px solid var(--line); border-radius:2px; padding:18px;}
+  .diagram-caption{display:flex; justify-content:space-between; font-family:var(--mono); font-size:0.68rem; color:var(--ink-soft); margin-top:10px; padding-top:10px; border-top:1px solid var(--line);}
+  .legend{display:flex; gap:16px; margin-top:14px; flex-wrap:wrap;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:0.68rem; color:var(--ink-soft);}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:2px; padding:30px;}
+  .field{margin-bottom:22px;}
+  .field label{display:block; font-family:var(--mono); font-size:0.72rem; color:var(--ink-soft); margin-bottom:9px;}
+  .field .num{color:var(--rust); margin-right:6px;}
+  select, input[type=range]{width:100%; font-family:var(--sans); font-size:0.98rem; padding:11px 12px; background:var(--bg); border:1px solid var(--line); border-radius:2px; color:var(--ink);}
+  select:focus, input:focus{outline:2px solid var(--teal); outline-offset:1px;}
+  .range-row{display:flex; align-items:center; gap:14px;}
+  .range-val{font-family:var(--mono); font-size:0.95rem; min-width:64px; color:var(--rust);}
+  .chip-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{font-family:var(--sans); font-size:0.86rem; padding:8px 14px; border:1px solid var(--line); border-radius:20px; cursor:pointer; background:var(--bg); color:var(--ink-soft); transition:border-color .15s, color .15s, background .15s; user-select:none;}
+  .chip.active{border-color:var(--rust); color:var(--rust); background:var(--rust-soft);}
+  .generate-btn{width:100%; font-family:var(--sans); font-weight:600; font-size:1rem; padding:15px; background:var(--ink); color:var(--bg); border:none; border-radius:2px; cursor:pointer; margin-top:6px; transition:background .15s;}
+  .generate-btn:hover{background:var(--teal);}
+  .generate-btn:disabled{background:var(--sage); cursor:wait;}
+  .hint{font-family:var(--mono); font-size:0.68rem; color:var(--sage); margin-top:10px; text-align:center;}
+
+  #results{display:none; padding:10px 0 80px;}
+  .results-head{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:28px; flex-wrap:wrap; gap:12px;}
+  .results-head h2{font-family:var(--serif); font-weight:500; font-size:1.6rem;}
+  .results-meta{font-family:var(--mono); font-size:0.72rem; color:var(--ink-soft); text-align:right;}
+
+  .coach-note{background:var(--teal-soft); border-left:3px solid var(--teal); padding:18px 22px; font-family:var(--serif); font-style:italic; font-size:1.02rem; color:#1f3a30; margin-bottom:30px; line-height:1.6;}
+  .coach-note .label{display:block; font-family:var(--mono); font-style:normal; font-size:0.65rem; color:var(--teal); margin-bottom:8px; letter-spacing:0.02em;}
+
+  .section-label{font-family:var(--mono); font-size:0.72rem; color:var(--ink-soft); margin:26px 0 10px; display:flex; align-items:center; gap:10px;}
+  .section-label .badge{background:var(--rust); color:#fff; font-size:0.62rem; padding:2px 7px; border-radius:10px;}
+  .section-label .badge.teal{background:var(--teal);}
+
+  .item-list{border:1px solid var(--line); background:var(--line);}
+  .exercise-row{display:grid; grid-template-columns:28px 1fr auto; gap:14px; padding:14px 18px; background:var(--bg); align-items:center;}
+  .exercise-row + .exercise-row{border-top:1px solid var(--line);}
+  .rank{font-family:var(--mono); font-size:0.8rem; color:var(--sage);}
+  .ex-name{font-size:0.95rem;}
+  .ex-freq{font-family:var(--mono); font-size:0.65rem; color:var(--rust); display:block; margin-top:2px;}
+  .ex-dose{font-family:var(--mono); font-size:0.82rem; color:var(--ink-soft); white-space:nowrap;}
+
+  .addon-note{font-family:var(--mono); font-size:0.68rem; color:var(--sage); margin:8px 0 4px;}
+
+  .locked-block{position:relative; margin-top:2px;}
+  .locked-block .item-list{filter:blur(5px); pointer-events:none; user-select:none;}
+  .lock-overlay{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:20px;}
+  .paywall-card{background:var(--bg); border:1px solid var(--ink); padding:30px 28px; max-width:400px; text-align:center; box-shadow:0 8px 30px rgba(22,36,28,0.15);}
+  .paywall-card .price{font-family:var(--serif); font-size:2rem; margin:8px 0 4px;}
+  .paywall-card .price span{font-size:1rem; color:var(--ink-soft);}
+  .paywall-card p{color:var(--ink-soft); font-size:0.88rem; margin-bottom:18px;}
+  .pay-btn{display:block; width:100%; background:var(--rust); color:#fff; font-weight:600; padding:13px; border:none; border-radius:2px; font-family:var(--sans); font-size:0.92rem; cursor:pointer; margin-bottom:10px; text-decoration:none;}
+  .free-unlock-btn{display:block; width:100%; background:var(--teal); color:#fff; font-weight:600; padding:13px; border:none; border-radius:2px; font-family:var(--sans); font-size:0.92rem; cursor:pointer; margin-bottom:10px;}
+  .unlock-link{font-family:var(--mono); font-size:0.7rem; color:var(--sage); background:none; border:none; text-decoration:underline; cursor:pointer;}
+
+  .action-row{display:flex; gap:12px; margin-top:30px; flex-wrap:wrap;}
+  .action-btn{font-family:var(--sans); font-size:0.88rem; font-weight:600; padding:12px 20px; border-radius:2px; cursor:pointer; border:1px solid var(--ink); background:transparent; color:var(--ink);}
+  .action-btn.primary{background:var(--ink); color:var(--bg);}
+  .action-btn:hover{opacity:0.8;}
+  .action-btn:disabled{opacity:0.4; cursor:not-allowed;}
+
+  footer{border-top:1px solid var(--line); padding:22px 0; font-family:var(--mono); font-size:0.68rem; color:var(--sage);}
+</style>
+</head>
+<body>
+
+<div id="login-gate">
+  <div class="login-card">
+    <h2>Set up your account</h2>
+    <p>Your protocols, unlocks, and free trials are tied to this email — no password needed, just used to keep your account on this device.</p>
+    <div class="login-error" id="login-error">Enter a valid email address.</div>
+    <input type="email" id="login-email" placeholder="you@email.com" autocomplete="email">
+    <button onclick="handleLogin()">Continue</button>
+    <div class="fineprint">FIRST 5 EXERCISES PER SPORT ARE ALWAYS FREE · 2 SPORTS GET FULL FREE ACCESS</div>
+  </div>
+</div>
+
+<header>
+  <div class="wrap">
+    <div class="brand">The Prehab <span>Engine</span></div>
+    <div class="account-bar" id="account-bar"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="diagram-col">
+      <h1>Train harder without breaking down.</h1>
+      <p class="lede">Tell it your sport, your load, and where it's aching. It ranks the ten moves that matter most for your sport's injury patterns — most critical first.</p>
+      <br>
+      <div class="diagram-frame">
+        <svg id="joint-svg" viewBox="0 0 300 380" width="100%" style="max-width:280px; display:block; margin:0 auto;"></svg>
+        <div class="diagram-caption">
+          <span id="diagram-sport">SELECT A SPORT</span>
+          <span id="diagram-count">0 RISK POINTS</span>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="dot" style="background:var(--rust)"></span>HIGH STRESS JOINT</div>
+        <div class="legend-item"><span class="dot" style="background:var(--teal)"></span>MOBILITY FOCUS</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="field">
+        <label><span class="num">01</span>PRIMARY SPORT</label>
+        <select id="sport"><option value="">Choose your sport…</option></select>
+      </div>
+      <div class="field">
+        <label><span class="num">02</span>WEEKLY TRAINING VOLUME</label>
+        <div class="range-row">
+          <input type="range" id="volume" min="2" max="14" value="6">
+          <span class="range-val" id="volume-val">6 hrs</span>
+        </div>
+      </div>
+      <div class="field">
+        <label><span class="num">03</span>NAGGING PAIN POINTS <span style="color:var(--sage)">(select any)</span></label>
+        <div class="chip-grid" id="pain-chips"></div>
+      </div>
+      <div class="field">
+        <label><span class="num">04</span>TRAINING AGE</label>
+        <select id="experience">
+          <option value="novice">Under 2 years competing</option>
+          <option value="intermediate" selected>2–5 years competing</option>
+          <option value="veteran">5+ years competing</option>
+        </select>
+      </div>
+      <button class="generate-btn" id="generate-btn" onclick="generateProtocol()">Generate my protocol</button>
+      <div class="hint">Ranks 10 moves per sport, then Claude personalizes the coaching note.</div>
+    </div>
+  </div>
+
+  <div id="results">
+    <div class="results-head">
+      <h2 id="result-title">Your Protocol</h2>
+      <div class="results-meta" id="result-meta"></div>
+    </div>
+
+    <div class="coach-note" id="coach-note" style="display:none;">
+      <span class="label">COACH'S NOTE — PERSONALIZED</span>
+      <span id="coach-note-text">Generating…</span>
+    </div>
+
+    <div id="addon-container"></div>
+
+    <div class="section-label"><span class="badge teal">FREE</span> THE ESSENTIAL 5</div>
+    <div id="free-list"></div>
+
+    <div class="section-label"><span class="badge">LOCKED</span> THE ADVANCED 5 — RECOVERY &amp; RESILIENCE</div>
+    <div id="paid-list"></div>
+
+    <div class="action-row" id="action-row" style="display:none;">
+      <button class="action-btn primary" onclick="downloadPDF()">Download PDF</button>
+      <button class="action-btn" onclick="document.getElementById('generate-btn').scrollIntoView({behavior:'smooth'})">Adjust inputs</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">THE PREHAB ENGINE — BUILT ON SPORTS-SCIENCE HEURISTICS, PERSONALIZED PER ATHLETE</div>
+</footer>
+
+<script>
+/* ---------------- ACCOUNT / LOGIN ---------------- */
+const UPI_ID = "thananjay007@okicici";
+const FREE_UNLOCK_LIMIT = 2;
+
+function loadAccount(){
+  try{ return JSON.parse(localStorage.getItem('prehab_account')); }catch(e){ return null; }
+}
+function saveAccount(acc){ localStorage.setItem('prehab_account', JSON.stringify(acc)); }
+
+let account = loadAccount();
+
+function renderAccountBar(){
+  if(!account) return;
+  const remaining = FREE_UNLOCK_LIMIT - account.freeUnlocksUsed.length;
+  document.getElementById('account-bar').innerHTML =
+    `${account.email} · ${remaining} free sport unlock${remaining===1?'':'s'} left <button onclick="switchAccount()">switch account</button>`;
+}
+
+function handleLogin(){
+  const input = document.getElementById('login-email');
+  const val = input.value.trim();
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!re.test(val)){
+    document.getElementById('login-error').style.display = 'block';
+    return;
+  }
+  account = { email: val, unlockedSports: [], freeUnlocksUsed: [] };
+  saveAccount(account);
+  document.getElementById('login-gate').style.display = 'none';
+  renderAccountBar();
+}
+
+function switchAccount(){
+  localStorage.removeItem('prehab_account');
+  location.reload();
+}
+
+if(account){
+  document.getElementById('login-gate').style.display = 'none';
+}
+
+/* ---------------- DATA LAYER: 10 ranked items per sport ---------------- */
+const SPORTS = {
+  running: { label:"Running / Track & Field", riskJoints:["ankle","knee","hip"], items:[
+    {name:"Ankle circles + banded dorsiflexion rocks", target:"ankle", dose:"2×10 each dir", freq:"Daily"},
+    {name:"Walking knee hugs to lunge with rotation", target:"hip", dose:"10 reps/side", freq:"Daily"},
+    {name:"Single-leg Romanian deadlift", target:"hip/hamstring", dose:"3×8/side", freq:"3×/wk"},
+    {name:"Copenhagen plank (adductor)", target:"groin", dose:"3×20s/side", freq:"3×/wk"},
+    {name:"Tibialis raises", target:"shin/ankle", dose:"3×15", freq:"3×/wk"},
+    {name:"Nordic hamstring curl (eccentric)", target:"hamstring", dose:"3×5", freq:"2×/wk"},
+    {name:"Single-leg calf raise, slow eccentric", target:"achilles/calf", dose:"3×12/side", freq:"2×/wk"},
+    {name:"Hip flexor eccentric lunge stretch", target:"hip flexor", dose:"3×20s/side", freq:"2×/wk"},
+    {name:"Foam roll IT band + quads", target:"lateral thigh/quad", dose:"6 min", freq:"Post-run"},
+    {name:"Glute bridge march", target:"glute/core", dose:"3×10/side", freq:"2×/wk"}
+  ]},
+  basketball: { label:"Basketball", riskJoints:["knee","ankle","shoulder"], items:[
+    {name:"Ankle alphabet + banded eversion", target:"ankle", dose:"1 set each", freq:"Daily"},
+    {name:"90/90 hip switches", target:"hip", dose:"10 reps/side", freq:"Daily"},
+    {name:"Nordic hamstring curl", target:"hamstring/ACL risk", dose:"3×6", freq:"3×/wk"},
+    {name:"Lateral bound + stick landing", target:"knee valgus control", dose:"3×6/side", freq:"3×/wk"},
+    {name:"Band pull-apart + external rotation", target:"shoulder", dose:"3×15", freq:"3×/wk"},
+    {name:"Single-leg box step-down, slow tempo", target:"knee/patellar tendon", dose:"3×8/side", freq:"2×/wk"},
+    {name:"Depth drop, soft landing", target:"ankle/knee shock absorption", dose:"3×5", freq:"2×/wk"},
+    {name:"Banded ankle inversion/eversion", target:"ankle stability", dose:"3×12 each", freq:"2×/wk"},
+    {name:"Hip flexor stretch, post-practice", target:"hip flexor", dose:"3×20s/side", freq:"Daily"},
+    {name:"Thoracic rotation mobility", target:"upper back", dose:"2×8/side", freq:"2×/wk"}
+  ]},
+  football: { label:"Football / Soccer", riskJoints:["hip","knee","ankle"], items:[
+    {name:"Copenhagen plank progression", target:"groin/adductor", dose:"3×20s/side", freq:"Daily"},
+    {name:"Ankle banded dorsiflexion", target:"ankle", dose:"2×10", freq:"Daily"},
+    {name:"Nordic hamstring curl", target:"hamstring", dose:"3×6", freq:"3×/wk"},
+    {name:"Single-leg RDL to hop stabilize", target:"hip/knee/ACL risk", dose:"3×6/side", freq:"3×/wk"},
+    {name:"Lateral shuffle with band", target:"hip abductors", dose:"3×15m", freq:"3×/wk"},
+    {name:"Cutting drill with deceleration focus", target:"knee control", dose:"4×3 cuts", freq:"2×/wk"},
+    {name:"Single-leg calf raise, slow eccentric", target:"achilles/calf", dose:"3×12/side", freq:"2×/wk"},
+    {name:"Hip 90/90 internal/external rotation", target:"hip mobility", dose:"2×8/side", freq:"Daily"},
+    {name:"Foam roll quads + adductors", target:"anterior/inner thigh", dose:"6 min", freq:"Post-match"},
+    {name:"Glute bridge march", target:"glute/core", dose:"3×10/side", freq:"2×/wk"}
+  ]},
+  weightlifting: { label:"Weightlifting / CrossFit", riskJoints:["shoulder","lower back","knee"], items:[
+    {name:"Banded shoulder dislocates", target:"shoulder", dose:"2×10", freq:"Daily"},
+    {name:"Cat-cow + 90/90 breathing", target:"lower back", dose:"2 min", freq:"Daily"},
+    {name:"Face pulls", target:"posterior shoulder", dose:"3×15", freq:"3×/wk"},
+    {name:"Bird-dog with 2s hold", target:"lower back stability", dose:"3×8/side", freq:"3×/wk"},
+    {name:"Ankle mobility on box (knee-to-wall)", target:"ankle (squat depth)", dose:"3×10", freq:"3×/wk"},
+    {name:"Copenhagen plank", target:"groin", dose:"3×20s/side", freq:"2×/wk"},
+    {name:"Prone Y-T-W raises", target:"scapular control", dose:"2×10 each", freq:"2×/wk"},
+    {name:"Wrist flexor/extensor stretch", target:"wrist/elbow", dose:"2×20s each", freq:"Daily"},
+    {name:"Hip flexor eccentric lunge stretch", target:"hip flexor", dose:"3×20s/side", freq:"2×/wk"},
+    {name:"Dead bug", target:"core/lower back", dose:"3×10/side", freq:"2×/wk"}
+  ]},
+  swimming: { label:"Swimming", riskJoints:["shoulder","lower back"], items:[
+    {name:"Banded shoulder external rotation", target:"rotator cuff", dose:"2×15", freq:"Daily"},
+    {name:"Thoracic spine rotation on foam roller", target:"t-spine mobility", dose:"2×8/side", freq:"Daily"},
+    {name:"Prone I-Y-T raises", target:"scapular stabilizers", dose:"3×10 each", freq:"3×/wk"},
+    {name:"Face pulls with external rotation", target:"posterior shoulder", dose:"3×15", freq:"3×/wk"},
+    {name:"Sleeper stretch", target:"shoulder posterior capsule", dose:"3×20s/side", freq:"3×/wk"},
+    {name:"Dead bug", target:"core/lower back", dose:"3×10/side", freq:"2×/wk"},
+    {name:"Scapular wall slides", target:"shoulder mechanics", dose:"3×10", freq:"2×/wk"},
+    {name:"Lat stretch on wall", target:"lat/shoulder mobility", dose:"3×20s/side", freq:"Daily"},
+    {name:"Bird-dog with 2s hold", target:"lower back stability", dose:"3×8/side", freq:"2×/wk"},
+    {name:"Ankle plantarflexion/dorsiflexion mobility", target:"ankle (kick technique)", dose:"2×10", freq:"2×/wk"}
+  ]},
+  volleyball: { label:"Volleyball", riskJoints:["shoulder","knee","ankle"], items:[
+    {name:"Ankle banded dorsiflexion rocks", target:"ankle (landing)", dose:"2×10", freq:"Daily"},
+    {name:"Band pull-aparts", target:"shoulder", dose:"2×15", freq:"Daily"},
+    {name:"Depth jump with stick landing", target:"knee/patellar tendon", dose:"3×5", freq:"3×/wk"},
+    {name:"Sleeper stretch + IR strengthening", target:"shoulder internal rotation", dose:"3×10", freq:"3×/wk"},
+    {name:"Single-leg box step-down", target:"knee control", dose:"3×8/side", freq:"3×/wk"},
+    {name:"Nordic hamstring curl", target:"hamstring", dose:"3×6", freq:"2×/wk"},
+    {name:"Banded ankle inversion/eversion", target:"ankle stability", dose:"3×12 each", freq:"2×/wk"},
+    {name:"Scapular wall slides", target:"shoulder mechanics", dose:"3×10", freq:"Daily"},
+    {name:"Thoracic rotation mobility", target:"upper back (spiking)", dose:"2×8/side", freq:"2×/wk"},
+    {name:"Glute bridge march", target:"glute/core", dose:"3×10/side", freq:"2×/wk"}
+  ]},
+  tennis: { label:"Tennis / Racquet Sports", riskJoints:["shoulder","elbow","knee"], items:[
+    {name:"Wrist extensor eccentric stretch", target:"elbow (tennis elbow)", dose:"3×20s/side", freq:"Daily"},
+    {name:"Banded shoulder ER at 90°", target:"rotator cuff", dose:"2×15", freq:"Daily"},
+    {name:"Reverse wrist curl (eccentric)", target:"elbow", dose:"3×12/side", freq:"3×/wk"},
+    {name:"Lateral bound + stick", target:"knee/ankle", dose:"3×6/side", freq:"3×/wk"},
+    {name:"Scapular wall slides", target:"shoulder mechanics", dose:"3×10", freq:"3×/wk"},
+    {name:"Thoracic rotation mobility", target:"upper back (serve)", dose:"2×8/side", freq:"2×/wk"},
+    {name:"Single-leg calf raise, slow eccentric", target:"achilles/calf", dose:"3×12/side", freq:"2×/wk"},
+    {name:"Grip strengthening, slow squeeze", target:"forearm/elbow", dose:"3×10, 3s hold", freq:"Daily"},
+    {name:"Hip 90/90 internal/external rotation", target:"hip mobility", dose:"2×8/side", freq:"2×/wk"},
+    {name:"Sleeper stretch", target:"shoulder posterior capsule", dose:"3×20s/side", freq:"2×/wk"}
+  ]},
+  cricket: { label:"Cricket", riskJoints:["shoulder","lower back","knee"], items:[
+    {name:"Thoracic rotation stretch", target:"lower back (bowling)", dose:"2×8/side", freq:"Daily"},
+    {name:"Banded shoulder external rotation", target:"shoulder (bowling/throwing)", dose:"2×15", freq:"Daily"},
+    {name:"Side plank with rotation", target:"lower back/obliques", dose:"3×8/side", freq:"3×/wk"},
+    {name:"Nordic hamstring curl", target:"hamstring (sprinting)", dose:"3×6", freq:"3×/wk"},
+    {name:"Single-leg landing drill", target:"knee (fast bowling front leg)", dose:"3×6/side", freq:"3×/wk"},
+    {name:"Face pulls", target:"posterior shoulder", dose:"3×15", freq:"2×/wk"},
+    {name:"Bird-dog with 2s hold", target:"lower back stability", dose:"3×8/side", freq:"2×/wk"},
+    {name:"Hip flexor eccentric lunge stretch", target:"hip flexor", dose:"3×20s/side", freq:"Daily"},
+    {name:"Wrist flexor/extensor stretch", target:"wrist (batting/spin)", dose:"2×20s each", freq:"2×/wk"},
+    {name:"Glute bridge march", target:"glute/core", dose:"3×10/side", freq:"2×/wk"}
+  ]},
+  combat: { label:"Combat Sports (MMA/Boxing/Wrestling)", riskJoints:["shoulder","knee","neck"], items:[
+    {name:"Neck isometric holds, 4-way", target:"neck", dose:"4×15s/dir", freq:"Daily"},
+    {name:"Banded shoulder dislocates", target:"shoulder", dose:"2×10", freq:"Daily"},
+    {name:"Nordic hamstring curl", target:"hamstring/knee stability", dose:"3×6", freq:"3×/wk"},
+    {name:"Face pulls", target:"posterior shoulder", dose:"3×15", freq:"3×/wk"},
+    {name:"Bear crawl hold", target:"core/shoulder stability", dose:"3×20s", freq:"3×/wk"},
+    {name:"Single-leg RDL", target:"hip/knee", dose:"3×8/side", freq:"2×/wk"},
+    {name:"Wrist flexor/extensor stretch", target:"wrist (grappling)", dose:"2×20s each", freq:"Daily"},
+    {name:"Hip 90/90 internal/external rotation", target:"hip mobility", dose:"2×8/side", freq:"2×/wk"},
+    {name:"Thoracic rotation mobility", target:"upper back", dose:"2×8/side", freq:"2×/wk"},
+    {name:"Ankle banded dorsiflexion", target:"ankle", dose:"2×10", freq:"2×/wk"}
+  ]},
+  gymnastics: { label:"Gymnastics / Cheer", riskJoints:["wrist","shoulder","lower back"], items:[
+    {name:"Wrist flexor/extensor stretch + loaded holds", target:"wrist", dose:"2×20s each", freq:"Daily"},
+    {name:"Shoulder dislocates with band", target:"shoulder", dose:"2×10", freq:"Daily"},
+    {name:"Hollow body hold", target:"core/lower back", dose:"3×20s", freq:"3×/wk"},
+    {name:"Scapular pull-ups", target:"shoulder/scapular control", dose:"3×8", freq:"3×/wk"},
+    {name:"Single-leg landing stick drill", target:"knee/ankle", dose:"3×6/side", freq:"3×/wk"},
+    {name:"Bridge shoulder extension stretch", target:"shoulder/lower back", dose:"3×15s", freq:"2×/wk"},
+    {name:"Ankle banded dorsiflexion", target:"ankle (landings)", dose:"2×10", freq:"2×/wk"},
+    {name:"Hip flexor eccentric lunge stretch", target:"hip flexor", dose:"3×20s/side", freq:"Daily"},
+    {name:"Bird-dog with 2s hold", target:"lower back stability", dose:"3×8/side", freq:"2×/wk"},
+    {name:"Grip strengthening, slow squeeze", target:"wrist/forearm", dose:"3×10, 3s hold", freq:"2×/wk"}
+  ]}
+};
+
+const PAIN_POINTS = ["Knee","Shoulder","Lower back","Ankle","Hip","Neck","Elbow/Wrist"];
+const PAIN_EXTRA = {
+  "Knee": {name:"Terminal knee extension with band", target:"knee (patellar tracking)", dose:"3×15/side", freq:"3×/wk"},
+  "Shoulder": {name:"Sleeper stretch", target:"shoulder (posterior capsule)", dose:"3×20s/side", freq:"3×/wk"},
+  "Lower back": {name:"Bird-dog with anti-rotation hold", target:"lower back", dose:"3×8/side", freq:"3×/wk"},
+  "Ankle": {name:"Banded ankle inversion/eversion", target:"ankle stability", dose:"3×12 each", freq:"3×/wk"},
+  "Hip": {name:"Clamshell with band, slow tempo", target:"hip (glute med)", dose:"3×15/side", freq:"3×/wk"},
+  "Neck": {name:"Chin tucks with isometric hold", target:"cervical stability", dose:"3×10, 3s hold", freq:"Daily"},
+  "Elbow/Wrist": {name:"Eccentric wrist curls (both directions)", target:"elbow/wrist tendon", dose:"3×12", freq:"3×/wk"}
+};
+
+/* ---------------- JOINT DIAGRAM ---------------- */
+const JOINT_POS = {
+  neck:{x:150,y:55}, shoulder:{x:112,y:95}, elbow:{x:95,y:150}, wrist:{x:85,y:205},
+  "lower back":{x:150,y:170}, hip:{x:135,y:205}, knee:{x:140,y:280}, ankle:{x:145,y:345}
+};
+function drawFigure(riskJoints, selectedPain){
+  const svg = document.getElementById('joint-svg');
+  const risk = new Set(riskJoints || []);
+  const pain = new Set((selectedPain||[]).map(p=>p.toLowerCase().replace('elbow/wrist','wrist')));
+  let body = `
+    <line x1="150" y1="45" x2="150" y2="175" stroke="#16241C" stroke-width="2"/>
+    <line x1="150" y1="70" x2="112" y2="95" stroke="#16241C" stroke-width="2"/>
+    <line x1="112" y1="95" x2="95" y2="150" stroke="#16241C" stroke-width="2"/>
+    <line x1="95" y1="150" x2="85" y2="205" stroke="#16241C" stroke-width="2"/>
+    <line x1="150" y1="70" x2="188" y2="95" stroke="#16241C" stroke-width="2"/>
+    <line x1="188" y1="95" x2="205" y2="150" stroke="#16241C" stroke-width="2"/>
+    <line x1="205" y1="150" x2="215" y2="205" stroke="#16241C" stroke-width="2"/>
+    <line x1="150" y1="175" x2="135" y2="205" stroke="#16241C" stroke-width="2"/>
+    <line x1="150" y1="175" x2="165" y2="205" stroke="#16241C" stroke-width="2"/>
+    <line x1="135" y1="205" x2="140" y2="280" stroke="#16241C" stroke-width="2"/>
+    <line x1="140" y1="280" x2="145" y2="345" stroke="#16241C" stroke-width="2"/>
+    <line x1="165" y1="205" x2="160" y2="280" stroke="#16241C" stroke-width="2"/>
+    <line x1="160" y1="280" x2="155" y2="345" stroke="#16241C" stroke-width="2"/>
+    <circle cx="150" cy="30" r="16" fill="none" stroke="#16241C" stroke-width="2"/>
+  `;
+  let markers = '';
+  Object.keys(JOINT_POS).forEach(joint=>{
+    const p = JOINT_POS[joint];
+    const isRisk = risk.has(joint);
+    const isPain = pain.has(joint);
+    let color = isPain ? '#C1440E' : (isRisk ? '#3D6B5C' : '#B9C2B7');
+    let r = (isPain || isRisk) ? 6 : 3.5;
+    markers += `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${color}" stroke="#EFF1EC" stroke-width="1.5"/>`;
+    if(isPain) markers += `<circle cx="${p.x}" cy="${p.y}" r="${r+5}" fill="none" stroke="#C1440E" stroke-width="1" opacity="0.5"/>`;
+  });
+  svg.innerHTML = body + markers;
+  const total = new Set([...risk, ...pain]).size;
+  document.getElementById('diagram-count').textContent = total + " RISK POINT" + (total===1?"":"S");
+}
+
+/* ---------------- UI SETUP ---------------- */
+const sportSelect = document.getElementById('sport');
+Object.keys(SPORTS).forEach(key=>{
+  const opt = document.createElement('option');
+  opt.value = key; opt.textContent = SPORTS[key].label;
+  sportSelect.appendChild(opt);
+});
+let selectedPain = [];
+const chipGrid = document.getElementById('pain-chips');
+PAIN_POINTS.forEach(p=>{
+  const chip = document.createElement('div');
+  chip.className = 'chip'; chip.textContent = p;
+  chip.onclick = ()=>{
+    chip.classList.toggle('active');
+    if(selectedPain.includes(p)) selectedPain = selectedPain.filter(x=>x!==p);
+    else selectedPain.push(p);
+    updateDiagram();
+  };
+  chipGrid.appendChild(chip);
+});
+const volumeSlider = document.getElementById('volume');
+const volumeVal = document.getElementById('volume-val');
+volumeSlider.oninput = ()=> volumeVal.textContent = volumeSlider.value + " hrs";
+sportSelect.onchange = updateDiagram;
+function updateDiagram(){
+  const sport = SPORTS[sportSelect.value];
+  document.getElementById('diagram-sport').textContent = sport ? sport.label.toUpperCase() : "SELECT A SPORT";
+  drawFigure(sport ? sport.riskJoints : [], selectedPain);
+}
+drawFigure([], []);
+renderAccountBar();
+
+/* ---------------- CLAUDE API PERSONALIZATION ---------------- */
+async function getCoachNote(sportLabel, volume, painPoints, experience){
+  const painStr = painPoints.length ? painPoints.join(", ") : "no reported pain points";
+  const prompt = `You are a sports physiotherapist writing a short, direct coach's note (2-3 sentences, max 60 words) for an athlete building a prehab/injury-prevention routine.
+Sport: ${sportLabel}
+Weekly training volume: ${volume} hours
+Pain points: ${painStr}
+Training age: ${experience}
+
+Write ONLY the note itself, no preamble, no quotation marks. Ground it in the specific sport and pain points given. Sound like an experienced clinician talking directly to the athlete, not a generic wellness app.`;
+  try{
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, messages:[{role:"user", content:prompt}] })
+    });
+    const data = await response.json();
+    const text = data.content.map(b=>b.text||"").join("").trim();
+    return text || fallbackNote(sportLabel, painPoints);
+  }catch(e){ return fallbackNote(sportLabel, painPoints); }
+}
+function fallbackNote(sportLabel, painPoints){
+  if(painPoints.length){
+    return `Given your ${painPoints.join(" and ").toLowerCase()} history in ${sportLabel.toLowerCase()}, prioritize the tagged add-ons before the general work — consistency here matters more than load.`;
+  }
+  return `No reported pain yet is the best time to build resilience in ${sportLabel.toLowerCase()} — stay consistent with the essential five and this protocol should keep you ahead of the usual overuse patterns.`;
+}
+
+/* ---------------- RENDER ---------------- */
+let lastProtocol = null, lastMeta = {}, lastSportKey = null;
+
+async function generateProtocol(){
+  if(!account){ document.getElementById('login-gate').style.display = 'flex'; return; }
+  const sportKey = sportSelect.value;
+  if(!sportKey){ alert("Pick a sport first."); return; }
+
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true; btn.textContent = "Building…";
+
+  const volume = parseInt(volumeSlider.value);
+  const experience = document.getElementById('experience').value;
+  const sport = SPORTS[sportKey];
+  lastSportKey = sportKey;
+  lastProtocol = sport.items;
+  lastMeta = { sportLabel: sport.label, volume, experience };
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('result-title').textContent = sport.label + " Protocol";
+  document.getElementById('result-meta').textContent =
+    volume + " HRS/WK · " + experience.toUpperCase() + " · " + (selectedPain.length ? selectedPain.join(", ").toUpperCase() : "NO REPORTED PAIN");
+
+  // pain/volume add-ons — always free, shown separately
+  const addonContainer = document.getElementById('addon-container');
+  let addons = selectedPain.filter(p=>PAIN_EXTRA[p]).map(p=>PAIN_EXTRA[p]);
+  if(volume >= 10) addons.push({name:"Full-body foam rolling + breathing reset", target:"nervous system down-regulation", dose:"10 min", freq:"High-volume days"});
+  if(addons.length){
+    let html = `<div class="section-label"><span class="badge teal">FREE</span> TARGETED FOR WHAT YOU REPORTED</div><div class="item-list">`;
+    addons.forEach((ex,i)=>{
+      html += `<div class="exercise-row"><span class="rank">${String(i+1).padStart(2,'0')}</span>
+        <div><div class="ex-name">${ex.name}</div><span class="ex-freq">${ex.target} · ${ex.freq}</span></div>
+        <div class="ex-dose">${ex.dose}</div></div>`;
+    });
+    html += `</div>`;
+    addonContainer.innerHTML = html;
+  } else {
+    addonContainer.innerHTML = '';
+  }
+
+  renderLists(sportKey, sport.items);
+
+  document.getElementById('coach-note').style.display = 'block';
+  document.getElementById('coach-note-text').textContent = "Generating…";
+  getCoachNote(sport.label, volume, selectedPain, experience).then(note=>{
+    document.getElementById('coach-note-text').textContent = note;
+  });
+
+  document.getElementById('results').scrollIntoView({behavior:'smooth'});
+  btn.disabled = false; btn.textContent = "Regenerate";
+}
+
+function renderLists(sportKey, items){
+  const free = items.slice(0,5);
+  const paid = items.slice(5,10);
+  const isUnlocked = account.unlockedSports.includes(sportKey);
+
+  let freeHtml = `<div class="item-list">`;
+  free.forEach((ex,i)=>{
+    freeHtml += `<div class="exercise-row"><span class="rank">${String(i+1).padStart(2,'0')}</span>
+      <div><div class="ex-name">${ex.name}</div><span class="ex-freq">${ex.target} · ${ex.freq}</span></div>
+      <div class="ex-dose">${ex.dose}</div></div>`;
+  });
+  freeHtml += `</div>`;
+  document.getElementById('free-list').innerHTML = freeHtml;
+
+  let paidHtml = `<div class="locked-block"><div class="item-list">`;
+  paid.forEach((ex,i)=>{
+    paidHtml += `<div class="exercise-row"><span class="rank">${String(i+6).padStart(2,'0')}</span>
+      <div><div class="ex-name">${ex.name}</div><span class="ex-freq">${ex.target} · ${ex.freq}</span></div>
+      <div class="ex-dose">${ex.dose}</div></div>`;
+  });
+  paidHtml += `</div>`;
+
+  if(!isUnlocked){
+    const remaining = FREE_UNLOCK_LIMIT - account.freeUnlocksUsed.length;
+    paidHtml += `<div class="lock-overlay"><div class="paywall-card">
+      <div style="font-family:var(--mono); font-size:0.66rem; color:var(--sage);">ADVANCED 5 LOCKED</div>
+      <div class="price">₹99 <span>one-time, this sport</span></div>
+      <p>Unlocks the recovery-focused half of this sport's protocol for good, plus the full PDF download.</p>`;
+    if(remaining > 0){
+      paidHtml += `<button class="free-unlock-btn" onclick="useFreeUnlock('${sportKey}')">Use free unlock (${remaining} left)</button>`;
+    }
+    paidHtml += `<a class="pay-btn" href="upi://pay?pa=${UPI_ID}&pn=PrehabEngine&am=99&cu=INR&tn=Prehab%20Protocol%20Unlock" target="_blank">Pay ₹99 via UPI</a>
+      <button class="unlock-link" onclick="confirmPaid('${sportKey}')">I've completed payment — unlock</button>
+    </div></div>`;
+  }
+  paidHtml += `</div>`;
+  document.getElementById('paid-list').innerHTML = paidHtml;
+  document.getElementById('action-row').style.display = isUnlocked ? 'flex' : 'none';
+}
+
+function useFreeUnlock(sportKey){
+  if(account.freeUnlocksUsed.length >= FREE_UNLOCK_LIMIT) return;
+  account.freeUnlocksUsed.push(sportKey);
+  account.unlockedSports.push(sportKey);
+  saveAccount(account);
+  renderAccountBar();
+  renderLists(sportKey, lastProtocol);
+}
+
+function confirmPaid(sportKey){
+  account.unlockedSports.push(sportKey);
+  saveAccount(account);
+  renderLists(sportKey, lastProtocol);
+}
+
+/* ---------------- PDF EXPORT ---------------- */
+function downloadPDF(){
+  if(!lastProtocol || !lastSportKey) return;
+  if(!account.unlockedSports.includes(lastSportKey)){ alert("Unlock the advanced 5 first to download the full PDF."); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const margin = 18; let y = 22;
+  doc.setFont("helvetica","bold"); doc.setFontSize(18);
+  doc.text(lastMeta.sportLabel + " — Prehab Protocol", margin, y); y += 8;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(100);
+  doc.text(lastMeta.volume + " hrs/week · " + lastMeta.experience + " training age", margin, y); y += 12;
+  doc.setTextColor(0);
+  lastProtocol.forEach((ex, i)=>{
+    if(y > 270){ doc.addPage(); y = 22; }
+    doc.setFont("helvetica","bold"); doc.setFontSize(11);
+    doc.text((i+1) + ". " + ex.name + "  [" + ex.freq + "]", margin, y); y += 6;
+    doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(120);
+    doc.text("   " + ex.target + " · " + ex.dose, margin, y); y += 8;
+    doc.setTextColor(0);
+  });
+  doc.save(lastMeta.sportLabel.replace(/\s+/g,'_') + "_Prehab_Protocol.pdf");
+}
+</script>
+</body>
+</html>
